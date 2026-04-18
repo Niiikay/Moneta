@@ -102,25 +102,60 @@ export default function Home() {
     processTransactions(MOCK)
   }
 
-  function handleFile(file) {
+  async function handleFile(file) {
     if (!file) return
-    Papa.parse(file, {
-      header: true,
-      complete: ({ data }) => {
-        const parsed = data
-          .map(row => {
-            const keys = Object.keys(row)
-            return {
+    setError('')
+
+    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      Papa.parse(file, {
+        header: true,
+        complete: ({ data }) => {
+          const keys = Object.keys(data[0] || {})
+          const parsed = data
+            .map(row => ({
               date: row[keys[0]] || '',
               description: row[keys[1]] || '',
               amount: parseFloat(row[keys[2]]) || 0,
-            }
-          })
-          .filter(r => r.amount < 0)
-        if (parsed.length === 0) { setError('No valid transactions found. Try demo data.'); return }
-        processTransactions(parsed)
+            }))
+            .filter(r => r.amount < 0)
+          if (parsed.length === 0) { setError('No valid transactions found. Try demo data.'); return }
+          processTransactions(parsed)
+        }
+      })
+      return
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a CSV, image (JPG/PNG/WEBP), or PDF file.')
+      return
+    }
+
+    setLoading(true)
+
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result.split(',')[1]
+      const mediaType = file.type
+      try {
+        const res = await fetch('/api/analyse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64, mediaType })
+        })
+        const data = await res.json()
+        if (data.error) throw new Error(data.error)
+        if (!data.transactions || data.transactions.length === 0) {
+          throw new Error('No transactions found. Try a clearer image or use CSV.')
+        }
+        processTransactions(data.transactions)
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
       }
-    })
+    }
+    reader.readAsDataURL(file)
   }
 
   async function runAnalysis() {
@@ -230,10 +265,10 @@ Weekend transactions: ${txns.filter(t => [0,6].includes(new Date(t.date).getDay(
                 onDragLeave={() => setDragOver(false)}
                 onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]) }}
               >
-                <input ref={fileRef} type="file" accept=".csv" onChange={e => handleFile(e.target.files[0])} />
+                <input ref={fileRef} type="file" accept=".csv,image/jpeg,image/png,image/webp,application/pdf" onChange={e => handleFile(e.target.files[0])} />
                 <div className={styles.dropIcon}>↑</div>
                 <p className={styles.dropTitle}>Drop your bank CSV here</p>
-                <p className={styles.dropSub}>Columns: date, description, amount — or use demo data below</p>
+                <p className={styles.dropSub}>CSV, bank statement photo (JPG/PNG), or scanned PDF — or use demo data below</p>
               </div>
 
               {error && <p className={styles.errorMsg}>{error}</p>}

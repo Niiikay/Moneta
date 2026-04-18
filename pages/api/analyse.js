@@ -31,7 +31,7 @@ Respond ONLY with the JSON array. No markdown, no preamble.`
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 800

@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.14);
+  --text: #f0ede8;
+  --text-muted: #6b6b6b;
+  --text-subtle: #3d3d3d;
+  --accent: #c9f542;
+  --accent-dim: rgba(201,245,66,0.12);
+  --accent-glow: rgba(201,245,66,0.25);
+  --red: #ff5c5c;
+  --red-dim: rgba(255,92,92,0.1);
+  --blue: #5c9fff;
+  --blue-dim: rgba(92,159,255,0.1);
+  --amber: #ffb347;
+  --amber-dim: rgba(255,179,71,0.1);
+  --green: #4ade80;
+  --green-dim: rgba(74,222,128,0.1);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.1);
+  --radius: 12px;
+  --radius-sm: 6px;
+  --radius-lg: 20px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(201,245,66,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 80% 80%, rgba(92,159,255,0.03) 0%, transparent 50%);
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+input[type="file"] { display: none; }
+
+button {
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.mono { font-family: 'DM Mono', monospace; }
+.serif { font-family: 'DM Serif Display', serif; }

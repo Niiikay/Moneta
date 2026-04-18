@@ -103,61 +103,86 @@ export default function Home() {
   }
 
   async function handleFile(file) {
-    if (!file) return
-    setError('')
+  if (!file) return
+  setError('')
 
-    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-      Papa.parse(file, {
-        header: true,
-        complete: ({ data }) => {
-          const keys = Object.keys(data[0] || {})
-          const parsed = data
-            .map(row => ({
-              date: row[keys[0]] || '',
-              description: row[keys[1]] || '',
-              amount: parseFloat(row[keys[2]]) || 0,
-            }))
-            .filter(r => r.amount < 0)
-          if (parsed.length === 0) { setError('No valid transactions found. Try demo data.'); return }
-          processTransactions(parsed)
-        }
-      })
-      return
-    }
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-    if (!validTypes.includes(file.type)) {
-      setError('Please upload a CSV, image (JPG/PNG/WEBP), or PDF file.')
-      return
-    }
-
-    setLoading(true)
-
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const base64 = ev.target.result.split(',')[1]
-      const mediaType = file.type
-      try {
-        const res = await fetch('/api/analyse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType })
-        })
-        const data = await res.json()
-        if (data.error) throw new Error(data.error)
-        if (!data.transactions || data.transactions.length === 0) {
-          throw new Error('No transactions found. Try a clearer image or use CSV.')
-        }
-        processTransactions(data.transactions)
-      } catch (e) {
-        setError(e.message)
-      } finally {
-        setLoading(false)
+  if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+    Papa.parse(file, {
+      header: true,
+      complete: ({ data }) => {
+        const keys = Object.keys(data[0] || {})
+        const parsed = data
+          .map(row => ({
+            date: row[keys[0]] || '',
+            description: row[keys[1]] || '',
+            amount: parseFloat(row[keys[2]]) || 0,
+          }))
+          .filter(r => r.amount < 0)
+        if (parsed.length === 0) { setError('No valid transactions found. Try demo data.'); return }
+        processTransactions(parsed)
       }
-    }
-    reader.readAsDataURL(file)
+    })
+    return
   }
 
+  // PDF — render first page to image using canvas, then send as image
+  if (file.type === 'application/pdf') {
+    setLoading(true)
+    try {
+      const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const page = await pdf.getPage(1)
+      const viewport = page.getViewport({ scale: 2 })
+      const canvas = document.createElement('canvas')
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+      const base64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1]
+      await sendToGroq(base64, 'image/jpeg')
+    } catch (e) {
+      setError('Could not read PDF. Try uploading a JPG/PNG screenshot instead.')
+      setLoading(false)
+    }
+    return
+  }
+
+  // Image
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp']
+  if (!validTypes.includes(file.type)) {
+    setError('Please upload a CSV, image (JPG/PNG/WEBP), or PDF file.')
+    return
+  }
+
+  setLoading(true)
+  const reader = new FileReader()
+  reader.onload = async (ev) => {
+    const base64 = ev.target.result.split(',')[1]
+    await sendToGroq(base64, file.type)
+  }
+  reader.readAsDataURL(file)
+}
+
+async function sendToGroq(base64, mediaType) {
+  try {
+    const res = await fetch('/api/analyse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: base64, mediaType })
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    if (!data.transactions || data.transactions.length === 0) {
+      throw new Error('No transactions found. Try a clearer image or use CSV.')
+    }
+    processTransactions(data.transactions)
+  } catch (e) {
+    setError(e.message)
+  } finally {
+    setLoading(false)
+  }
+}
   async function runAnalysis() {
     setLoading(true)
     setError('')
@@ -241,7 +266,7 @@ Weekend transactions: ${txns.filter(t => [0,6].includes(new Date(t.date).getDay(
           )}
 
           <div className={styles.sidebarBottom}>
-            <span className={styles.poweredBy}>Powered by Gemini 2.0 Flash</span>
+            <span className={styles.poweredBy}>Powered by Groq</span>
           </div>
         </aside>
 
@@ -267,7 +292,7 @@ Weekend transactions: ${txns.filter(t => [0,6].includes(new Date(t.date).getDay(
               >
                 <input ref={fileRef} type="file" accept=".csv,image/jpeg,image/png,image/webp,application/pdf" onChange={e => handleFile(e.target.files[0])} />
                 <div className={styles.dropIcon}>↑</div>
-                <p className={styles.dropTitle}>Drop your bank CSV here</p>
+                <p className={styles.dropTitle}>Drop your statement here</p>
                 <p className={styles.dropSub}>CSV, bank statement photo (JPG/PNG), or scanned PDF — or use demo data below</p>
               </div>
 
@@ -410,7 +435,7 @@ Weekend transactions: ${txns.filter(t => [0,6].includes(new Date(t.date).getDay(
               <div className={styles.pageHeader}>
                 <div>
                   <h2 className={`${styles.pageTitle} serif`}>AI Insights</h2>
-                  <p className={styles.pageSub}>Powered by Gemini 2.0 Flash</p>
+                  <p className={styles.pageSub}>Powered by Groq</p>
                 </div>
                 {txns.length > 0 && (
                   <button className={styles.analyseBtn} onClick={runAnalysis} disabled={loading}>
@@ -424,7 +449,7 @@ Weekend transactions: ${txns.filter(t => [0,6].includes(new Date(t.date).getDay(
                   <div className={styles.loadingDots}>
                     <span /><span /><span />
                   </div>
-                  <p>Gemini is reading your patterns…</p>
+                  <p>Groq is reading your patterns…</p>
                 </div>
               )}
 
